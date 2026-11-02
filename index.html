@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpatialMapper 3D - Physical Space Measurement</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/tailwind-config.js"></script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="h-screen w-screen flex flex-col">
+
+    <!-- TOP HEADER BAR -->
+    <header class="h-14 bg-darkcard border-b border-darkborder flex items-center justify-between px-4 z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-brand-500/10 rounded-lg text-brand-400 border border-brand-500/20 flex items-center justify-center">
+                <i class="fa-solid fa-cubes-stacked text-lg"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-sm font-bold text-white tracking-wide">SpatialMapper 3D</h1>
+                    <span class="text-[10px] bg-brand-500/20 text-brand-400 px-1.5 py-0.5 rounded border border-brand-500/30">v2.5 Vision AI</span>
+                </div>
+                <p class="text-[11px] text-slate-400">Physical Space Measurement & 3D Spatial Reconstruction</p>
+            </div>
+        </div>
+
+        <!-- System Stats & Export Menu -->
+        <div class="flex items-center space-x-3">
+            <div class="hidden md:flex items-center space-x-2 text-xs bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">
+                <span id="camera-status-indicator" class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span id="camera-status-text" class="text-slate-300">Camera Idle</span>
+            </div>
+
+            <!-- Export Actions -->
+            <div class="flex items-center space-x-2">
+                <button id="btn-export-obj" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg transition flex items-center gap-1.5 border border-slate-700">
+                    <i class="fa-solid fa-file-export text-brand-400"></i> <span class="hidden sm:inline">Export</span> .OBJ
+                </button>
+                <button id="btn-export-ply" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg transition flex items-center gap-1.5 border border-slate-700">
+                    <i class="fa-solid fa-cloud text-emerald-400"></i> <span class="hidden sm:inline">Point Cloud</span> .PLY
+                </button>
+                <button id="btn-export-json" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium rounded-lg transition flex items-center gap-1.5 shadow-lg shadow-brand-600/20">
+                    <i class="fa-solid fa-download"></i> Spatial JSON
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- LEFT CONTROL SIDEPANEL -->
+        <aside class="w-80 border-r border-darkborder bg-darkcard flex flex-col z-10 shrink-0">
+            <!-- Navigation Tabs -->
+            <div class="flex border-b border-darkborder text-xs font-medium text-slate-400">
+                <button id="tab-btn-capture" class="flex-1 py-3 text-center transition flex justify-center items-center gap-1.5 hover:text-slate-200">
+                    <i class="fa-solid fa-camera"></i> Scan & Input
+                </button>
+                <button id="tab-btn-calibrate" class="flex-1 py-3 text-center transition flex justify-center items-center gap-1.5 hover:text-slate-200">
+                    <i class="fa-solid fa-sliders"></i> Adjust
+                </button>
+                <button id="tab-btn-objects" class="flex-1 py-3 text-center active-tab transition flex justify-center items-center gap-1.5">
+                    <i class="fa-solid fa-ruler-combined"></i> Measures
+                </button>
+            </div>
+
+            <!-- TAB CONTENT PANELS -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-5">
+
+                <!-- 1. CAPTURE & INPUT PANEL -->
+                <div id="panel-capture" class="space-y-4 hidden">
+                    <!-- Source Selection -->
+                    <div class="space-y-2">
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                            <span><i class="fa-solid fa-video text-brand-400"></i> Video / Camera Source</span>
+                            <span id="resolution-badge" class="text-[10px] text-brand-400 font-mono">640x480</span>
+                        </label>
+                        <select id="select-camera" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 p-2.5 focus:border-brand-500 focus:outline-none">
+                            <option value="">Searching for cameras...</option>
+                        </select>
+                        <div class="flex gap-2 pt-1">
+                            <button id="btn-start-camera" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition flex justify-center items-center gap-1.5 border border-slate-700">
+                                <i class="fa-solid fa-power-off text-emerald-400"></i> Start Cam
+                            </button>
+                            <button id="btn-capture-frame" class="flex-1 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-medium transition flex justify-center items-center gap-1.5 shadow-lg shadow-brand-600/20 disabled:opacity-50" disabled>
+                                <i class="fa-solid fa-camera-retro"></i> 3D Scan
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- File Upload Option -->
+                    <div class="border-t border-slate-800/80 pt-3 space-y-2">
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-image text-brand-400"></i> Or Upload Physical Photo
+                        </label>
+                        <div class="relative flex items-center justify-center w-full">
+                            <label class="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-slate-700 rounded-lg cursor-pointer bg-slate-900 hover:bg-slate-800/60 transition">
+                                <div class="flex flex-col items-center justify-center pt-2 pb-2 text-center">
+                                    <i class="fa-solid fa-cloud-arrow-up text-slate-400 text-lg mb-1"></i>
+                                    <p class="text-[11px] text-slate-400">Click or drop room photo here</p>
+                                </div>
+                                <input id="input-file-image" type="file" accept="image/*" class="hidden" />
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Demo Pre-Set Scans -->
+                    <div class="border-t border-slate-800/80 pt-3 space-y-2">
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-cubes text-brand-400"></i> Try Demo Sample Scans
+                        </label>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <button id="btn-preset-desk" class="py-1.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-[11px] text-slate-300 transition text-center truncate">
+                                Workstation
+                            </button>
+                            <button id="btn-preset-room" class="py-1.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-[11px] text-slate-300 transition text-center truncate">
+                                Living Space
+                            </button>
+                            <button id="btn-preset-box" class="py-1.5 px-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-[11px] text-slate-300 transition text-center truncate">
+                                Cargo Box
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Auto Spatial Recognition Call -->
+                    <div class="border-t border-slate-800/80 pt-3 space-y-2">
+                        <div class="p-3 bg-gradient-to-r from-brand-900/40 to-slate-900 rounded-xl border border-brand-500/30 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs font-semibold text-brand-300 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-brand-400"></i> Neural Vision AI Scan
+                                </span>
+                                <span class="text-[9px] bg-brand-500/20 text-brand-300 px-1.5 py-0.5 rounded">Auto 3D</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-tight">
+                                Automatically detects room objects, estimates real metric sizes, and plots 3D bounding boxes.
+                            </p>
+                            <button id="btn-ai-spatial-detect" class="w-full py-2 bg-gradient-to-r from-brand-600 to-cyan-600 hover:from-brand-500 hover:to-cyan-500 text-white rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5 shadow-md">
+                                <i class="fa-solid fa-brain"></i> AI Auto-Detect Objects
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. CALIBRATION & DISPLAY CONTROLS -->
+                <div id="panel-calibrate" class="space-y-4 hidden">
+                    <div class="space-y-3">
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-eye text-brand-400"></i> Visual Rendering Mode
+                        </label>
+                        <select id="select-render-style" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 p-2.5 focus:border-brand-500">
+                            <option value="textured">Photogrammetric Texture</option>
+                            <option value="depth">Depth Heatmap Shader</option>
+                            <option value="wireframe">Wireframe Mesh</option>
+                            <option value="points">Dense Point Cloud</option>
+                        </select>
+
+                        <!-- Depth Extrusion Adjuster -->
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>Depth Extrusion Scale</span>
+                                <span id="depth-scale-val" class="text-brand-400 font-mono">1.2m</span>
+                            </div>
+                            <input id="slider-depth-scale" type="range" min="0.1" max="3.5" step="0.1" value="1.2" class="w-full accent-brand-500 bg-slate-800">
+                        </div>
+
+                        <!-- Grid Quality / Density -->
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>Sampling Grid Density</span>
+                                <span id="density-val" class="text-brand-400 font-mono">120 x 90</span>
+                            </div>
+                            <input id="slider-density" type="range" min="40" max="180" step="20" value="120" class="w-full accent-brand-500 bg-slate-800">
+                        </div>
+
+                        <div class="space-y-2 pt-2 border-t border-slate-800">
+                            <label class="flex items-center text-xs text-slate-300 gap-2 cursor-pointer">
+                                <input type="checkbox" id="chk-show-boundingboxes" checked class="rounded bg-slate-900 border-slate-700 text-brand-500">
+                                <span>Show AI Object Bounding Boxes</span>
+                            </label>
+                            <label class="flex items-center text-xs text-slate-300 gap-2 cursor-pointer">
+                                <input type="checkbox" id="chk-show-floorgrid" checked class="rounded bg-slate-900 border-slate-700 text-brand-500">
+                                <span>Show Metric Spatial Grid Plane</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Physical Metric Calibration -->
+                    <div class="border-t border-slate-800 pt-4 space-y-3">
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-ruler text-brand-400"></i> Physical Scale Calibration
+                        </label>
+
+                        <div>
+                            <label class="text-xs text-slate-400 mb-1 block">Measurement Units</label>
+                            <select id="select-unit" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 p-2">
+                                <option value="m">Meters (m)</option>
+                                <option value="cm">Centimeters (cm)</option>
+                                <option value="ft">Feet & Inches (ft)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-slate-400 mb-1 block">Reference Scaling Multiplier</label>
+                            <div class="flex items-center gap-2">
+                                <input id="input-scale-factor" type="number" value="1.0" step="0.05" min="0.1" max="10.0" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 p-2">
+                                <button id="btn-apply-calibration" class="py-2 px-3 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs transition">
+                                    Apply
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. OBJECTS & MEASUREMENTS -->
+                <div id="panel-objects" class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            Spatial Annotations
+                        </label>
+                        <button id="btn-clear-measurements" class="text-xs text-rose-400 hover:text-rose-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-trash-can"></i> Clear All
+                        </button>
+                    </div>
+
+                    <!-- Measurement Mode Selectors -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btn-mode-point" class="py-2.5 px-3 bg-brand-600 text-white rounded-lg text-xs font-medium flex justify-center items-center gap-2 border border-brand-500/50 shadow-md">
+                            <i class="fa-solid fa-ruler-horizontal"></i> <span>Line Distance</span>
+                        </button>
+                        <button id="btn-mode-box" class="py-2.5 px-3 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-xs font-medium flex justify-center items-center gap-2 border border-slate-700 transition">
+                            <i class="fa-solid fa-vector-square"></i> <span>3D Box</span>
+                        </button>
+                    </div>
+
+                    <!-- 3D Box Size Customizer -->
+                    <div id="box-size-controls" class="p-3 bg-slate-900/90 rounded-lg border border-slate-800 space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[11px] font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-expand"></i> Selected Box Size
+                            </label>
+                            <span id="box-dimensions-label" class="text-[10px] text-slate-400 font-mono">0.95m × 1.00m × 1.00m</span>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-0.5">
+                                    <span>Width (X)</span>
+                                    <span id="val-box-w" class="text-slate-200 font-mono">0.95 m</span>
+                                </div>
+                                <input id="slider-box-w" type="range" min="0.1" max="5.0" step="0.05" value="0.95" class="w-full accent-brand-500 bg-slate-800">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-0.5">
+                                    <span>Height (Y)</span>
+                                    <span id="val-box-h" class="text-slate-200 font-mono">1.00 m</span>
+                                </div>
+                                <input id="slider-box-h" type="range" min="0.1" max="5.0" step="0.05" value="1.0" class="w-full accent-brand-500 bg-slate-800">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-0.5">
+                                    <span>Depth (Z)</span>
+                                    <span id="val-box-d" class="text-slate-200 font-mono">1.00 m</span>
+                                </div>
+                                <input id="slider-box-d" type="range" min="0.1" max="5.0" step="0.05" value="1.0" class="w-full accent-brand-500 bg-slate-800">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Measurement History -->
+                    <div id="measurement-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        <div class="text-center py-8 text-xs text-slate-500 italic border border-dashed border-slate-800 rounded-lg">
+                            No active 3D measurements.<br>Click points in the viewport to measure.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- FOOTER SYSTEM STATUS -->
+            <div class="p-3 border-t border-darkborder bg-slate-900/60 text-[11px] text-slate-400 flex items-center justify-between">
+                <span>Point Depth: <span id="hover-coords" class="text-slate-200 font-mono">X:1.32 Y:0.99 Z:0.03</span></span>
+                <span id="scale-factor-tag" class="bg-slate-800 px-2 py-0.5 rounded text-brand-400 font-mono">Scale: 1.0x</span>
+            </div>
+        </aside>
+
+        <!-- VIEWPORT CANVAS AREA -->
+        <main class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+
+            <!-- Hidden Processing Canvas and Video Streams -->
+            <video id="webcam-feed" autoplay playsinline muted class="hidden"></video>
+            <canvas id="processing-canvas" class="hidden"></canvas>
+            <img id="reference-img-source" class="hidden" alt="Source frame" />
+
+            <!-- ThreeJS WebGL Container -->
+            <div id="three-container" class="w-full h-full absolute inset-0 cursor-crosshair"></div>
+
+            <!-- On-Screen HUD Overlay Elements -->
+            <div class="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
+                <div class="glass-panel px-3 py-1.5 rounded-xl text-xs text-slate-200 flex items-center gap-2 pointer-events-auto">
+                    <span id="active-tool-dot" class="w-2.5 h-2.5 rounded-full bg-brand-400 animate-pulse"></span>
+                    <span id="interaction-mode-text" class="font-medium">Active Mode: 3D Ruler Point Selection</span>
+                </div>
+
+                <!-- Quick Metric Summary Tag -->
+                <div id="quick-spatial-tag" class="glass-panel px-3 py-1.5 rounded-xl text-[11px] text-slate-300 hidden pointer-events-auto">
+                    <i class="fa-solid fa-cube text-brand-400 mr-1"></i> Scene Extents: <span id="scene-extents-val" class="font-mono text-white">4.0m x 3.0m x 1.2m</span>
+                </div>
+            </div>
+
+            <!-- Viewport Camera Presets -->
+            <div class="absolute top-4 right-4 z-10 flex gap-1.5 glass-panel p-1.5 rounded-xl">
+                <button id="btn-view-reset" title="Reset Camera" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-200 transition">
+                    <i class="fa-solid fa-arrows-to-dot"></i> 3D Reset
+                </button>
+                <button id="btn-view-top" title="Top View (2D Blueprint)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-200 transition">
+                    Top Blueprint
+                </button>
+                <button id="btn-view-front" title="Front Elevation" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-200 transition">
+                    Front
+                </button>
+                <button id="btn-view-side" title="Side Elevation" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-200 transition">
+                    Side
+                </button>
+            </div>
+
+            <!-- Floating Measurement Info Card -->
+            <div id="floating-info-card" class="absolute bottom-6 right-6 z-10 glass-panel p-4 rounded-xl border border-slate-700/60 shadow-2xl w-80 hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-xs font-semibold text-brand-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-calculator"></i> Spatial Object Inspector
+                    </h4>
+                    <span id="info-card-type" class="text-[10px] bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded font-mono">3D Line</span>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                    <div class="flex justify-between text-slate-400"><span>Euclidean Distance:</span><span id="info-dist" class="text-white font-mono font-bold">0.00 m</span></div>
+                    <div class="flex justify-between text-slate-400"><span>Bounding Width (X):</span><span id="info-width" class="text-slate-200 font-mono">0.00 m</span></div>
+                    <div class="flex justify-between text-slate-400"><span>Bounding Height (Y):</span><span id="info-height" class="text-slate-200 font-mono">0.00 m</span></div>
+                    <div class="flex justify-between text-slate-400"><span>Bounding Depth (Z):</span><span id="info-depth" class="text-slate-200 font-mono">0.00 m</span></div>
+                </div>
+            </div>
+
+            <!-- Instruction Toast Footer -->
+            <div id="instruction-toast" class="absolute bottom-6 left-6 z-10 glass-panel px-4 py-2.5 rounded-xl text-xs text-slate-300 flex items-center gap-3">
+                <i class="fa-solid fa-circle-info text-brand-400 text-base"></i>
+                <div>
+                    <span class="font-semibold text-white">Controls:</span>
+                    <span>Left-drag to orbit • Right-drag to pan • Scroll to zoom • Left click mesh to place measurement pins.</span>
+                </div>
+            </div>
+
+            <!-- Toast Alert Overlay -->
+            <div id="toast-message-box" class="absolute top-16 left-1/2 transform -translate-x-1/2 z-30 glass-panel px-4 py-2 rounded-xl text-xs font-medium text-white shadow-xl transition-all opacity-0 pointer-events-none flex items-center gap-2 border border-brand-500/40">
+                <i id="toast-icon" class="fa-solid fa-info-circle text-brand-400"></i>
+                <span id="toast-text">Notification message</span>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="js/app.js"></script>
+</body>
+</html>
